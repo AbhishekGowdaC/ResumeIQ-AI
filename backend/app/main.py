@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.api.users import router as user_router
 
 from app.database.database import Base, engine
 from app.models.user import User
@@ -10,6 +11,8 @@ app = FastAPI(
     description="AI-powered Resume Screening Platform",
     version="1.0.0"
 )
+app.include_router(user_router)
+
 @app.get("/")
 def home():
     return {
