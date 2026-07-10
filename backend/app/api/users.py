@@ -1,6 +1,7 @@
 from fastapi import APIRouter , Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from fastapi.security import OAuth2PasswordRequestForm
 
 from app.schemas.user import UserCreate
 from app.models.user import User
@@ -8,6 +9,7 @@ from app.database.database import get_db
 from app.auth.security import hash_password, verify_password
 from app.schemas.user import UserLogin
 from app.auth.jwt_handler import create_access_token
+from app.auth.oauth2 import get_current_user
 
 router=APIRouter()
 
@@ -37,23 +39,49 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 }
 
 @router.post("/login")
-def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    db_user = db.query(User).filter(
+        User.email == form_data.username
+    ).first()
 
     if not db_user:
         raise HTTPException(
             status_code=401,
-            detail = "Invalid email or password"
+            detail="Invalid email or password"
         )
-    if not verify_password(user.password, db_user.password):
+
+    if not verify_password(
+        form_data.password,
+        db_user.password
+    ):
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
+
     access_token = create_access_token(
         data={"sub": db_user.email}
     )
-    return{
+
+    return {
         "access_token": access_token,
         "token_type": "bearer"
+    }
+@router.get("/me")
+def get_me (
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(
+        User.email == current_user["sub"]
+    ).first()
+
+    return{
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role
     }
