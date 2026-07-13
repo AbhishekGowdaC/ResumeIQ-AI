@@ -2,6 +2,9 @@ from fastapi import APIRouter , Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import UploadFile, File
+import os
+import shutil
 
 from app.schemas.user import UserCreate
 from app.models.user import User
@@ -84,4 +87,25 @@ def get_me (
         "name": user.name,
         "email": user.email,
         "role": user.role
+    }
+
+@router.post("/upload-resume")
+def upload_resume(
+    file: UploadFile = File(...)
+):
+    upload_folder = "uploads/resumes"
+
+    os.makedirs(upload_folder, exist_ok=True)
+    
+    file_path = os.path.join(
+        upload_folder,file.filename
+    )
+    with open(file_path,"wb") as buffer:
+        shutil.copyfileobj(
+            file.file,
+            buffer
+        )
+    return{
+        "message": "Resume uploaded successfull",
+        "filename": file.filename
     }
