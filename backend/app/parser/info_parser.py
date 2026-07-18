@@ -41,47 +41,53 @@ def extract_name(text: str):
 
     return None
 
-SKILLS = [
-    "Python",
-    "SQL",
-    "FastAPI",
-    "Flask",
-    "Django",
-    "TensorFlow",
-    "PyTorch",
-    "Machine Learning",
-    "Deep Learning",
-    "OpenCV",
-    "NumPy",
-    "Pandas",
-    "Scikit-learn",
-    "Git",
-    "GitHub",
-    "Docker",
-    "AWS",
-    "React",
-    "JavaScript",
-    "HTML",
-    "CSS",
-    "C",
-    "C++",
-    "Java",
-    "PostgreSQL",
-    "MySQL"
-]
+import re
+
 def extract_skills(text: str):
+
+    # Normalize spaces and convert to lowercase
+    text = re.sub(r"\s+", " ", text).lower()
+
+    skills_list = [
+        "Python",
+        "Java",
+        "C++",
+        "JavaScript",
+        "SQL",
+        "MySQL",
+        "PostgreSQL",
+        "MongoDB",
+        "Machine Learning",
+        "Deep Learning",
+        "TensorFlow",
+        "PyTorch",
+        "Scikit-learn",
+        "Pandas",
+        "NumPy",
+        "OpenCV",
+        "Flask",
+        "FastAPI",
+        "Django",
+        "Git",
+        "GitHub",
+        "Docker",
+        "AWS",
+        "NLP"
+    ]
 
     found_skills = []
 
-    text = text.lower()
-
-    for skill in SKILLS:
-
+    for skill in skills_list:
         if skill.lower() in text:
-
             found_skills.append(skill)
 
+    # Handle C separately
+    if re.search(r"(?<!\w)C(?!\w)", text, re.IGNORECASE):
+        found_skills.append("C")
+
     return found_skills
+import re
+
 EDUCATION = [
     "Bachelor of Engineering",
     "B.E",
@@ -101,11 +107,13 @@ EDUCATION = [
     "Diploma",
     "PhD"
 ]
+
 def extract_education(text: str):
 
     found_education = []
 
-    text = text.lower()
+    # Convert multiple spaces/newlines/tabs into a single space
+    text = re.sub(r"\s+", " ", text).lower()
 
     for degree in EDUCATION:
 
@@ -113,6 +121,7 @@ def extract_education(text: str):
             found_education.append(degree)
 
     return found_education
+
 def extract_projects(text: str):
 
     projects = []

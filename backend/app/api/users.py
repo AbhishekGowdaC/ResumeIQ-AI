@@ -5,6 +5,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import UploadFile, File
 import os
 import shutil
+
+from app.ai.matcher import match_skills
 from app.models.job import Job
 from app.models.resume import Resume
 from app.schemas.user import UserCreate
@@ -24,6 +26,12 @@ from app.parser.info_parser import (
     extract_projects
 )
 from app.parser.job_parser import extract_job_title
+from app.ai.ats_scorer import (
+    calculate_ats_score,
+    calculate_education_score,
+    calculate_project_score,
+    calculate_keyword_score
+)
 
 router=APIRouter()
 
@@ -133,6 +141,7 @@ def upload_resume(
     phone = extract_phone(text)
     skills = extract_skills(text)
     education = extract_education(text)
+    print("Extracted Education:", education)
     projects = extract_projects(text)
 
     new_resume = Resume(
@@ -143,11 +152,13 @@ def upload_resume(
     skills=", ".join(skills),
     education=", ".join(education),
     projects=", ".join(projects),
+    raw_text=text,
     user_id=user.id
 )
     db.add(new_resume)
     db.commit()
     db.refresh(new_resume)
+    print(skills)
     return{
         "message": "Resume uploaded successfull",
         "resume_id": new_resume.id,
@@ -161,6 +172,8 @@ def upload_resume(
             "projects": projects
         }
     }
+
+
 @router.post("/upload-job")
 def upload_job(
     file: UploadFile = File(...),
@@ -195,6 +208,85 @@ def upload_job(
         'message': "Job uploaded suceesfully",
         'job_id': new_job.id,
         'title': title,
-        'fiename': file.filename,
+        'filename': file.filename,
         'skills': skills        
         }
+
+
+@router.get("/match-resume/{resume_id}/{job_id}")
+def match_resume(
+    resume_id: int,
+    job_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    resume = db.query(Resume).filter(
+        Resume.id == resume_id
+    ).first()
+    if not resume:
+        raise HTTPException(
+            status_code=404,
+            detail = "Resume not found"
+        )
+    job= db.query(Job).filter(
+        Job.id == job_id
+    ).first()
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found"
+        )
+    resume_skills = (
+        resume.skills.split(", ")
+        if resume.skills 
+        else []
+    )
+    job_skills = (
+        job.skills.split(", ")
+        if job.skills
+        else []
+    )
+
+    skill_result = match_skills(
+        resume_skills,
+        job_skills
+    )
+    skill_score = skill_result["score"]
+    education_score = calculate_education_score(
+        resume.education,
+        job.description
+    )
+    project_score = calculate_project_score(
+        resume.projects,
+        job_skills
+    )
+    keyword_score = calculate_keyword_score(
+        resume.raw_text,
+        job_skills
+    )
+    ats_score = calculate_ats_score(
+        skill_score,
+        education_score,
+        project_score,
+        keyword_score
+    )
+    return {
+        "resume_id": resume.id,
+        "job_id": job.id,
+
+        "candidate": resume.name,
+        "job_title": job.title,
+
+        "ats_score": ats_score,
+
+        "score_breakdown": {
+            "skill_score": skill_score,
+            "education_score": education_score,
+            "project_score": project_score,
+            "keyword_score": keyword_score 
+        },
+
+        "matched_skills": skill_result["matched"],
+        "missing_skills": skill_result["missing"]
+    }

@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import relationship
-
 from app.database.database import Base
 
 
@@ -23,6 +22,8 @@ class Resume(Base):
 
     projects = Column(String)
 
+    raw_text = Column(Text)
+    
     user_id = Column(Integer, ForeignKey("users.id"))
 
     user = relationship("User")
