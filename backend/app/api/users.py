@@ -33,6 +33,12 @@ from app.ai.ats_scorer import (
     calculate_keyword_score
 )
 
+from app.ai.recommendation import (
+    get_match_level,
+    get_recommendations,
+    get_strengths
+)
+
 router=APIRouter()
 
 @router.post("/register")
@@ -175,6 +181,8 @@ def upload_resume(
 
 
 @router.post("/upload-job")
+
+
 def upload_job(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
@@ -214,15 +222,19 @@ def upload_job(
 
 
 @router.get("/match-resume/{resume_id}/{job_id}")
+
+
 def match_resume(
     resume_id: int,
     job_id: int,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    
     resume = db.query(Resume).filter(
         Resume.id == resume_id
     ).first()
+
     if not resume:
         raise HTTPException(
             status_code=404,
@@ -252,6 +264,7 @@ def match_resume(
         resume_skills,
         job_skills
     )
+
     skill_score = skill_result["score"]
     education_score = calculate_education_score(
         resume.education,
@@ -271,6 +284,17 @@ def match_resume(
         project_score,
         keyword_score
     )
+
+    match_level = get_match_level(ats_score)
+    
+    strenghts = get_strengths(
+        skill_result["matched"]
+    )
+
+    recommendations = get_recommendations(
+        skill_result['missing']
+    )
+
     return {
         "resume_id": resume.id,
         "job_id": job.id,
@@ -288,5 +312,9 @@ def match_resume(
         },
 
         "matched_skills": skill_result["matched"],
-        "missing_skills": skill_result["missing"]
+        "missing_skills": skill_result["missing"],
+
+        "strengths": strenghts,
+
+        "recommendation": recommendations
     }
