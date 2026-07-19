@@ -318,3 +318,98 @@ def match_resume(
 
         "recommendation": recommendations
     }
+
+@router.get("/rank-candidates/{job_id}")
+def rank_candidates(
+    job_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Get Job
+    job = db.query(Job).filter(
+        Job.id == job_id
+    ).first()
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found"
+        )
+
+    # Get all resumes
+    resumes = db.query(Resume).all()
+
+    ranking = []
+
+    job_skills = (
+        job.skills.split(", ")
+        if job.skills
+        else []
+    )
+
+    for resume in resumes:
+
+        resume_skills = (
+            resume.skills.split(", ")
+            if resume.skills
+            else []
+        )
+
+        # Skill Matching
+        skill_result = match_skills(
+            resume_skills,
+            job_skills
+        )
+
+        skill_score = skill_result["score"]
+
+        # Education Score
+        education_score = calculate_education_score(
+            resume.education,
+            job.description
+        )
+
+        # Project Score
+        project_score = calculate_project_score(
+            resume.projects,
+            job_skills
+        )
+
+        # Keyword Score
+        keyword_score = calculate_keyword_score(
+            resume.raw_text,
+            job_skills
+        )
+
+        # Final ATS Score
+        ats_score = calculate_ats_score(
+            skill_score,
+            education_score,
+            project_score,
+            keyword_score
+        )
+
+        ranking.append({
+            "candidate": resume.name,
+            "resume_id": resume.id,
+            "ats_score": ats_score,
+            "matched_skills": skill_result["matched"],
+            "missing_skills": skill_result["missing"]
+        })
+
+    # Sort by ATS Score
+    ranking.sort(
+        key=lambda x: x["ats_score"],
+        reverse=True
+    )
+
+    # Add Rank
+    for index, candidate in enumerate(ranking):
+        candidate["rank"] = index + 1
+
+    return {
+        "job_id": job.id,
+        "job_title": job.title,
+        "total_candidates": len(ranking),
+        "ranking": ranking
+    }
